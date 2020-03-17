@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
 
 try:
     __version__ = __import__('pkg_resources').get_distribution('clamd').version
@@ -276,7 +274,7 @@ class ClamdUnixSocket(ClamdNetworkSocket):
     """
     Class for using clamd with an unix socket
     """
-    def __init__(self, path="/var/run/clamav/clamd.ctl", timeout=None):
+    def __init__(self, path="/var/run/clamav/clamd.sock", timeout=None):
         """
         class initialisation
 
