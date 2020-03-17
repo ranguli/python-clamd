@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 
 try:
-    __version__ = __import__('pkg_resources').get_distribution('clamd').version
+    __version__ = __import__("pkg_resources").get_distribution("clamd").version
 except:
-    __version__ = ''
+    __version__ = ""
 
 # $Source$
 
@@ -15,10 +15,12 @@ import contextlib
 import re
 import base64
 
-scan_response = re.compile(r"^(?P<path>.*): ((?P<virus>.+) )?(?P<status>(FOUND|OK|ERROR))$")
+scan_response = re.compile(
+    r"^(?P<path>.*): ((?P<virus>.+) )?(?P<status>(FOUND|OK|ERROR))$"
+)
 EICAR = base64.b64decode(
-    b'WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5E'
-    b'QVJELUFOVElWSVJVUy1URVNU\nLUZJTEUhJEgrSCo=\n'
+    b"WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5E"
+    b"QVJELUFOVElWSVJVUy1URVNU\nLUZJTEUhJEgrSCo=\n"
 )
 
 
@@ -42,7 +44,8 @@ class ClamdNetworkSocket(object):
     """
     Class for using clamd with a network socket
     """
-    def __init__(self, host='127.0.0.1', port=3310, timeout=None):
+
+    def __init__(self, host="127.0.0.1", port=3310, timeout=None):
         """
         class initialisation
 
@@ -73,16 +76,14 @@ class ClamdNetworkSocket(object):
         # or just "message"
         if len(exception.args) == 1:
             return "Error connecting to {host}:{port}. {msg}.".format(
-                host=self.host,
-                port=self.port,
-                msg=exception.args[0]
+                host=self.host, port=self.port, msg=exception.args[0]
             )
         else:
             return "Error {erno} connecting {host}:{port}. {msg}.".format(
                 erno=exception.args[0],
                 host=self.host,
                 port=self.port,
-                msg=exception.args[1]
+                msg=exception.args[1],
             )
 
     def ping(self):
@@ -105,19 +106,19 @@ class ClamdNetworkSocket(object):
         """
         try:
             self._init_socket()
-            self._send_command('SHUTDOWN')
+            self._send_command("SHUTDOWN")
             # result = self._recv_response()
         finally:
             self._close_socket()
 
     def scan(self, file):
-        return self._file_system_scan('SCAN', file)
+        return self._file_system_scan("SCAN", file)
 
     def contscan(self, file):
-        return self._file_system_scan('CONTSCAN', file)
+        return self._file_system_scan("CONTSCAN", file)
 
     def multiscan(self, file):
-        return self._file_system_scan('MULTISCAN', file)
+        return self._file_system_scan("MULTISCAN", file)
 
     def _basic_command(self, command):
         """
@@ -154,7 +155,7 @@ class ClamdNetworkSocket(object):
             self._send_command(command, file)
 
             dr = {}
-            for result in self._recv_response_multiline().split('\n'):
+            for result in self._recv_response_multiline().split("\n"):
                 if result:
                     filename, reason, status = self._parse_response(result)
                     dr[filename] = (status, reason)
@@ -180,22 +181,22 @@ class ClamdNetworkSocket(object):
 
         try:
             self._init_socket()
-            self._send_command('INSTREAM')
+            self._send_command("INSTREAM")
 
             max_chunk_size = 1024  # MUST be < StreamMaxLength in /etc/clamav/clamd.conf
 
             chunk = buff.read(max_chunk_size)
             while chunk:
-                size = struct.pack(b'!L', len(chunk))
+                size = struct.pack(b"!L", len(chunk))
                 self.clamd_socket.send(size + chunk)
                 chunk = buff.read(max_chunk_size)
 
-            self.clamd_socket.send(struct.pack(b'!L', 0))
+            self.clamd_socket.send(struct.pack(b"!L", 0))
 
             result = self._recv_response()
 
             if len(result) > 0:
-                if result == 'INSTREAM size limit exceeded. ERROR':
+                if result == "INSTREAM size limit exceeded. ERROR":
                     raise BufferTooLongError(result)
 
                 filename, reason, status = self._parse_response(result)
@@ -214,7 +215,7 @@ class ClamdNetworkSocket(object):
         """
         self._init_socket()
         try:
-            self._send_command('STATS')
+            self._send_command("STATS")
             return self._recv_response_multiline()
         finally:
             self._close_socket()
@@ -224,11 +225,11 @@ class ClamdNetworkSocket(object):
         `man clamd` recommends to prefix commands with z, but we will use \n
         terminated strings, as python<->clamd has some problems with \0x00
         """
-        concat_args = ''
+        concat_args = ""
         if args:
-            concat_args = ' ' + ' '.join(args)
+            concat_args = " " + " ".join(args)
 
-        cmd = 'n{cmd}{args}\n'.format(cmd=cmd, args=concat_args).encode('utf-8')
+        cmd = "n{cmd}{args}\n".format(cmd=cmd, args=concat_args).encode("utf-8")
         self.clamd_socket.send(cmd)
 
     def _recv_response(self):
@@ -236,8 +237,8 @@ class ClamdNetworkSocket(object):
         receive line from clamd
         """
         try:
-            with contextlib.closing(self.clamd_socket.makefile('rb')) as f:
-                return f.readline().decode('utf-8').strip()
+            with contextlib.closing(self.clamd_socket.makefile("rb")) as f:
+                return f.readline().decode("utf-8").strip()
         except (socket.error, socket.timeout):
             e = sys.exc_info()[1]
             raise ConnectionError("Error while reading from socket: {0}".format(e.args))
@@ -247,8 +248,8 @@ class ClamdNetworkSocket(object):
         receive multiple line response from clamd and strip all whitespace characters
         """
         try:
-            with contextlib.closing(self.clamd_socket.makefile('rb')) as f:
-                return f.read().decode('utf-8')
+            with contextlib.closing(self.clamd_socket.makefile("rb")) as f:
+                return f.read().decode("utf-8")
         except (socket.error, socket.timeout):
             e = sys.exc_info()[1]
             raise ConnectionError("Error while reading from socket: {0}".format(e.args))
@@ -274,6 +275,7 @@ class ClamdUnixSocket(ClamdNetworkSocket):
     """
     Class for using clamd with an unix socket
     """
+
     def __init__(self, path="/var/run/clamav/clamd.sock", timeout=None):
         """
         class initialisation
@@ -302,12 +304,9 @@ class ClamdUnixSocket(ClamdNetworkSocket):
         # or just "message"
         if len(exception.args) == 1:
             return "Error connecting to {path}. {msg}.".format(
-                path=self.unix_socket,
-                msg=exception.args[0]
+                path=self.unix_socket, msg=exception.args[0]
             )
         else:
             return "Error {erno} connecting {path}. {msg}.".format(
-                erno=exception.args[0],
-                path=self.unix_socket,
-                msg=exception.args[1]
+                erno=exception.args[0], path=self.unix_socket, msg=exception.args[1]
             )
