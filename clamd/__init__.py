@@ -46,12 +46,13 @@ class ClamdNetworkSocket(object):
     """
 
     def __init__(self, host="127.0.0.1", port=3310, timeout=None):
-        """
-        class initialisation
+        """fooo
 
-        host (string) : hostname or ip address
-        port (int) : TCP port
-        timeout (float or None) : socket timeout
+        Args:
+            host (string): Hostname or ip address
+            port (int): TCP port
+            timeout (float or None): Socket timeout
+
         """
 
         self.host = host
@@ -96,13 +97,14 @@ class ClamdNetworkSocket(object):
         return self._basic_command("RELOAD")
 
     def shutdown(self):
-        """
-        Force Clamd to shutdown and exit
+        """Force Clamd to shutdown and exit
 
-        return: nothing
+        Raises:
+            ConnectionError: In case of communication problem
+            
+        Return:
+            None
 
-        May raise:
-          - ConnectionError: in case of communication problem
         """
         try:
             self._init_socket()
@@ -141,13 +143,14 @@ class ClamdNetworkSocket(object):
         Do not stop on error or virus found.
         Scan with archive support enabled.
 
-        file (string): filename or directory (MUST BE ABSOLUTE PATH !)
+        Args:
+            file (str): Absolute path to a filename or directory
 
-        return:
-          - (dict): {filename1: ('FOUND', 'virusname'), filename2: ('ERROR', 'reason')}
+        Returns:
+            dict: Contains the scan resulsts {filename1: ('FOUND', 'virusname'), filename2: ('ERROR', 'reason')}
 
-        May raise:
-          - ConnectionError: in case of communication problem
+        Raises:
+            ConnectionError: in case of communication problem
         """
 
         try:
@@ -166,17 +169,18 @@ class ClamdNetworkSocket(object):
             self._close_socket()
 
     def instream(self, buff):
-        """
-        Scan a buffer
+        """Scan a buffer
+        
+        Args:
+            filelikeobj (TextIO): Buffer to scan
 
-        buff  filelikeobj: buffer to scan
+        Returns:
+            dict: Results of the scan {filename1: ("virusname", "status")}
 
-        return:
-          - (dict): {filename1: ("virusname", "status")}
+        Raises:
+            BufferTooLongError: if the buffer size exceeds clamd limits
+            ConnectionError: in case of communication problem
 
-        May raise :
-          - BufferTooLongError: if the buffer size exceeds clamd limits
-          - ConnectionError: in case of communication problem
         """
 
         try:
@@ -205,13 +209,13 @@ class ClamdNetworkSocket(object):
             self._close_socket()
 
     def stats(self):
-        """
-        Get Clamscan stats
+        """Get Clamscan stats
 
-        return: (string) clamscan stats
+        Raises:
+            ConnectionError: in case of communication problem
 
-        May raise:
-          - ConnectionError: in case of communication problem
+        Returns: (string) clamscan stats
+
         """
         self._init_socket()
         try:
