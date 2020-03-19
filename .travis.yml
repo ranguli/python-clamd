@@ -17,7 +17,8 @@ matrix:
       env: TOXENV=py36
 
 
-install: - sudo apt-get install clamav-daemon clamav-freshclam clamav-unofficial-sigs
+install: 
+  - sudo apt-get install clamav-daemon clamav-freshclam clamav-unofficial-sigs
   - sudo freshclam --verbose
   - sudo systemctl start clamav-daemon
   - pip install tox
