@@ -8,32 +8,17 @@ matrix:
     - python: 3.8
       env: TOXENV=black
     - python: 3.8
-      env: TOXENV=mypy
-    - python: 3.6
-      env: TOXENV=pypy
-      
+      env: TOXENV=py38
+
     - python: 3.7
-      env: TOXENV=flake8
-    - python: 3.7
-      env: TOXENV=black
-    - python: 3.7
-      env: TOXENV=mypy
+      env: TOXENV=py37
+
     - python: 3.6
-      env: TOXENV=pypy
-      
-    - python: 3.6
-      env: TOXENV=flake8
-    - python: 3.6
-      env: TOXENV=black
-    - python: 3.6
-      env: TOXENV=mypy
-    - python: 3.6
-      env: TOXENV=pypy
+      env: TOXENV=py36
 
 
-install:
-  - sudo apt-get install clamav-daemon clamav-freshclam clamav-unofficial-sigs
+install: - sudo apt-get install clamav-daemon clamav-freshclam clamav-unofficial-sigs
   - sudo freshclam --verbose
-  - sudo service clamav-daemon start
+  - sudo systemctl start clamav-daemon
   - pip install tox
-script: tox -e $TOX_ENV
+script: tox
