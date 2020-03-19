@@ -21,4 +21,5 @@ install:
   - sudo apt-get install clamav-daemon clamav-freshclam clamav-unofficial-sigs
   - sudo systemctl start clamav-daemon
   - pip install tox
+before_script: $TRAVIS_BUILD_DIR/scripts/travis.sh
 script: tox
