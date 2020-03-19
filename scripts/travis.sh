@@ -1,2 +1,4 @@
 #!/bin/sh
 sudo mv $TRAVIS_BUILD_DIR/scripts/clamd.conf /etc/clamd.conf
+sudo systemctl start clamav-daemon
+
