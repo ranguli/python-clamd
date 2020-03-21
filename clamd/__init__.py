@@ -289,14 +289,13 @@ class ClamdUnixSocket(ClamdNetworkSocket):
             self.clamd_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             self.clamd_socket.connect(socket_path)
             self.clamd_socket.settimeout(self.timeout)
-        except (socket.error, FileNotFoundError):
-            e = sys.exc_info()[1]
-            raise ConnectionError(self._error_message(e))
+        except (FileNotFoundError) as e:
+            raise ConnectionError(e)
         else:
             self.unix_socket = socket_path
 
     def _socket_locations(self):
-        """Enumerate all of the common locations the clamd unix socket could be."""
+        """Enumerate all of the common locations the clamd unix socket could be in."""
 
         self.paths = ["/tmp/", "/var/run", "/var/run/clamav", "/run/clamav"]
         self.names = ["clamd.ctl", "clamd.sock", "clamd.socket"]
@@ -304,20 +303,24 @@ class ClamdUnixSocket(ClamdNetworkSocket):
         return [os.path.join(path, name) for path in self.paths for name in self.names]
 
     def _init_socket(self):
+        """Initialize a socket if we're given one, attempt to soldier one without one."""
 
         if self.unix_socket:
             self._connect_socket(self.unix_socket)
         else:
-            for possible_socket in self._socket_locations():
+            last_socket = len(self._socket_locations()) - 1
+            for current_socket, possible_socket in enumerate(self._socket_locations()):
                 try:
                     self._connect_socket(possible_socket)
-                except ConnectionError:
-                    pass
+                except (ConnectionError) as e:
+                    if current_socket == last_socket:
+                       # We've exhausted the list with nothing to show for it
+                       raise ClamdError(e)
+                    else:
+                       pass
                 else:
                     self.unix_socket = possible_socket
                     break
-            else:
-                raise ConnectionError
 
     def _error_message(self, exception):
         # args for socket.error can either be (errno, "message")
