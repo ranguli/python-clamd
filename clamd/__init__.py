@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import os
 import socket
 import sys
 import struct
@@ -38,7 +39,7 @@ class ClamdNetworkSocket(object):
     """
 
     def __init__(self, host="127.0.0.1", port=3310, timeout=None):
-        """fooo
+        """
 
         Args:
             host (string): Hostname or ip address
@@ -272,28 +273,51 @@ class ClamdUnixSocket(ClamdNetworkSocket):
     Class for using clamd with an unix socket
     """
 
-    def __init__(self, path="/var/run/clamav/clamd.sock", timeout=None):
+    def __init__(self, path=None, timeout=None):
         """
         class initialisation
 
-        path (string) : unix socket path
+        path (string) : Unix socket path
         timeout (float or None) : socket timeout
         """
 
         self.unix_socket = path
         self.timeout = timeout
 
-    def _init_socket(self):
-        """
-        internal use only
-        """
+    def _connect_socket(self, socket_path):
         try:
             self.clamd_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.clamd_socket.connect(self.unix_socket)
+            self.clamd_socket.connect(socket_path)
             self.clamd_socket.settimeout(self.timeout)
-        except socket.error:
+        except (socket.error, FileNotFoundError):
             e = sys.exc_info()[1]
             raise ConnectionError(self._error_message(e))
+        else:
+            self.unix_socket = socket_path
+
+    def _socket_locations(self):
+        """Enumerate all of the common locations the clamd unix socket could be."""
+
+        self.paths = ["/tmp/", "/var/run", "/var/run/clamav", "/run/clamav"]
+        self.names = ["clamd.ctl", "clamd.sock", "clamd.socket"]
+
+        return [os.path.join(path, name) for path in self.paths for name in self.names]
+
+    def _init_socket(self):
+
+        if self.unix_socket:
+            self._connect_socket(self.unix_socket)
+        else:
+            for possible_socket in self._socket_locations():
+                try:
+                    self._connect_socket(possible_socket)
+                except ConnectionError:
+                    pass
+                else:
+                    self.unix_socket = possible_socket
+                    break
+            else:
+                raise ConnectionError
 
     def _error_message(self, exception):
         # args for socket.error can either be (errno, "message")
