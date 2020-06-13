@@ -3,9 +3,9 @@ import sys
 import struct
 import contextlib
 import re
-import base64
 
 from clammy import exceptions
+
 
 class ClamAVDaemon:
     """
@@ -193,7 +193,7 @@ class ClamAVDaemon:
         if args:
             concat_args = " " + " ".join(args)
 
-        #cmd = 'n{cmd}{args}\n'.format(cmd=cmd, args=concat_args).encode('utf-8')
+        # cmd = 'n{cmd}{args}\n'.format(cmd=cmd, args=concat_args).encode('utf-8')
         cmd = f"n{cmd}{concat_args}\n".encode("utf-8")
         self.clamd_socket.send(cmd)
 
