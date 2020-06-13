@@ -1,15 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-from __future__ import unicode_literals
-
-try:
-    __version__ = __import__('pkg_resources').get_distribution('clamd').version
-except:
-    __version__ = ''
-
-# $Source$
-
-
 import socket
 import sys
 import struct
@@ -17,75 +5,50 @@ import contextlib
 import re
 import base64
 
-scan_response = re.compile(r"^(?P<path>.*): ((?P<virus>.+) )?(?P<status>(FOUND|OK|ERROR))$")
-EICAR = base64.b64decode(
-    b'WDVPIVAlQEFQWzRcUFpYNTQoUF4pN0NDKTd9JEVJQ0FSLVNUQU5E'
-    b'QVJELUFOVElWSVJVUy1URVNU\nLUZJTEUhJEgrSCo=\n'
-)
+from clammy import exceptions
 
-
-class ClamdError(Exception):
-    pass
-
-
-class ResponseError(ClamdError):
-    pass
-
-
-class BufferTooLongError(ResponseError):
-    """Class for errors with clamd using INSTREAM with a buffer lenght > StreamMaxLength in /etc/clamav/clamd.conf"""
-
-
-class ConnectionError(ClamdError):
-    """Class for errors communication with clamd"""
-
-
-class ClamdNetworkSocket(object):
+class ClamAVDaemon:
     """
     Class for using clamd with a network socket
     """
-    def __init__(self, host='127.0.0.1', port=3310, timeout=None):
-        """
-        class initialisation
 
-        host (string) : hostname or ip address
-        port (int) : TCP port
-        timeout (float or None) : socket timeout
+    def __init__(self, host="127.0.0.1", port=3310, unix_socket=None, timeout=None):
+        """
+        Args:
+            host (string): The hostname or IP address (if connecting to a network socket)
+            port (int): TCP port (if connecting to a network socket)
+            unix_socket (str):
+            timeout (float or None) : socket timeout
         """
 
         self.host = host
         self.port = port
+        self.unix_socket = unix_socket
         self.timeout = timeout
 
+        if self.unix_socket:
+            self.socket_type = socket.AF_UNIX
+        else:
+            self.socket_type = socket.AF_INET
+
     def _init_socket(self):
-        """
-        internal use only
-        """
+
         try:
-            self.clamd_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.clamd_socket.connect((self.host, self.port))
+            self.clamd_socket = socket.socket(self.socket_type, socket.SOCK_STREAM)
+
+            if self.socket_type == socket.AF_INET:
+                self.clamd_socket.connect((self.host, self.port))
+            elif self.socket_type == socket.AF_UNIX:
+                self.clamd_socket.connect(self.unix_socket)
+
             self.clamd_socket.settimeout(self.timeout)
 
         except socket.error:
-            e = sys.exc_info()[1]
-            raise ConnectionError(self._error_message(e))
-
-    def _error_message(self, exception):
-        # args for socket.error can either be (errno, "message")
-        # or just "message"
-        if len(exception.args) == 1:
-            return "Error connecting to {host}:{port}. {msg}.".format(
-                host=self.host,
-                port=self.port,
-                msg=exception.args[0]
-            )
-        else:
-            return "Error {erno} connecting {host}:{port}. {msg}.".format(
-                erno=exception.args[0],
-                host=self.host,
-                port=self.port,
-                msg=exception.args[1]
-            )
+            if self.socket_type == socket.AF_UNIX:
+                error_message = f'Error connecting to Unix socket "{self.unix_socket}"'
+            elif self.socket_Type == socket.AF_INET:
+                error_message = f'Error connecting to network socket with host "{self.host}" and port "{self.port}"'
+            raise exceptions.ConnectionError(error_message)
 
     def ping(self):
         return self._basic_command("PING")
@@ -107,19 +70,19 @@ class ClamdNetworkSocket(object):
         """
         try:
             self._init_socket()
-            self._send_command('SHUTDOWN')
+            self._send_command("SHUTDOWN")
             # result = self._recv_response()
         finally:
             self._close_socket()
 
     def scan(self, file):
-        return self._file_system_scan('SCAN', file)
+        return self._file_system_scan("SCAN", file)
 
     def contscan(self, file):
-        return self._file_system_scan('CONTSCAN', file)
+        return self._file_system_scan("CONTSCAN", file)
 
     def multiscan(self, file):
-        return self._file_system_scan('MULTISCAN', file)
+        return self._file_system_scan("MULTISCAN", file)
 
     def _basic_command(self, command):
         """
@@ -130,7 +93,7 @@ class ClamdNetworkSocket(object):
             self._send_command(command)
             response = self._recv_response().rsplit("ERROR", 1)
             if len(response) > 1:
-                raise ResponseError(response[0])
+                raise exceptions.ResponseError(response[0])
             else:
                 return response[0]
         finally:
@@ -156,7 +119,7 @@ class ClamdNetworkSocket(object):
             self._send_command(command, file)
 
             dr = {}
-            for result in self._recv_response_multiline().split('\n'):
+            for result in self._recv_response_multiline().split("\n"):
                 if result:
                     filename, reason, status = self._parse_response(result)
                     dr[filename] = (status, reason)
@@ -182,23 +145,23 @@ class ClamdNetworkSocket(object):
 
         try:
             self._init_socket()
-            self._send_command('INSTREAM')
+            self._send_command("INSTREAM")
 
             max_chunk_size = 1024  # MUST be < StreamMaxLength in /etc/clamav/clamd.conf
 
             chunk = buff.read(max_chunk_size)
             while chunk:
-                size = struct.pack(b'!L', len(chunk))
+                size = struct.pack(b"!L", len(chunk))
                 self.clamd_socket.send(size + chunk)
                 chunk = buff.read(max_chunk_size)
 
-            self.clamd_socket.send(struct.pack(b'!L', 0))
+            self.clamd_socket.send(struct.pack(b"!L", 0))
 
             result = self._recv_response()
 
             if len(result) > 0:
-                if result == 'INSTREAM size limit exceeded. ERROR':
-                    raise BufferTooLongError(result)
+                if result == "INSTREAM size limit exceeded. ERROR":
+                    raise exceptions.BufferTooLongError(result)
 
                 filename, reason, status = self._parse_response(result)
                 return {filename: (status, reason)}
@@ -216,7 +179,7 @@ class ClamdNetworkSocket(object):
         """
         self._init_socket()
         try:
-            self._send_command('STATS')
+            self._send_command("STATS")
             return self._recv_response_multiline()
         finally:
             self._close_socket()
@@ -226,11 +189,12 @@ class ClamdNetworkSocket(object):
         `man clamd` recommends to prefix commands with z, but we will use \n
         terminated strings, as python<->clamd has some problems with \0x00
         """
-        concat_args = ''
+        concat_args = ""
         if args:
-            concat_args = ' ' + ' '.join(args)
+            concat_args = " " + " ".join(args)
 
-        cmd = 'n{cmd}{args}\n'.format(cmd=cmd, args=concat_args).encode('utf-8')
+        #cmd = 'n{cmd}{args}\n'.format(cmd=cmd, args=concat_args).encode('utf-8')
+        cmd = f"n{cmd}{concat_args}\n".encode("utf-8")
         self.clamd_socket.send(cmd)
 
     def _recv_response(self):
@@ -238,22 +202,24 @@ class ClamdNetworkSocket(object):
         receive line from clamd
         """
         try:
-            with contextlib.closing(self.clamd_socket.makefile('rb')) as f:
-                return f.readline().decode('utf-8').strip()
+            with contextlib.closing(self.clamd_socket.makefile("rb")) as f:
+                return f.readline().decode("utf-8").strip()
         except (socket.error, socket.timeout):
             e = sys.exc_info()[1]
-            raise ConnectionError("Error while reading from socket: {0}".format(e.args))
+            raise ConnectionError(f"Error while reading from socket: {e.args}")
 
     def _recv_response_multiline(self):
         """
         receive multiple line response from clamd and strip all whitespace characters
         """
         try:
-            with contextlib.closing(self.clamd_socket.makefile('rb')) as f:
-                return f.read().decode('utf-8')
+            with contextlib.closing(self.clamd_socket.makefile("rb")) as f:
+                return f.read().decode("utf-8")
         except (socket.error, socket.timeout):
             e = sys.exc_info()[1]
-            raise ConnectionError("Error while reading from socket: {0}".format(e.args))
+            raise exceptions.ConnectionError(
+                f"Error while reading from socket: {e.args}"
+            )
 
     def _close_socket(self):
         """
@@ -266,50 +232,12 @@ class ClamdNetworkSocket(object):
         """
         parses responses for SCAN, CONTSCAN, MULTISCAN and STREAM commands.
         """
+
+        scan_response = re.compile(
+            r"^(?P<path>.*): ((?P<virus>.+) )?(?P<status>(FOUND|OK|ERROR))$"
+        )
+
         try:
             return scan_response.match(msg).group("path", "virus", "status")
         except AttributeError:
-            raise ResponseError(msg.rsplit("ERROR", 1)[0])
-
-
-class ClamdUnixSocket(ClamdNetworkSocket):
-    """
-    Class for using clamd with an unix socket
-    """
-    def __init__(self, path="/var/run/clamav/clamd.ctl", timeout=None):
-        """
-        class initialisation
-
-        path (string) : unix socket path
-        timeout (float or None) : socket timeout
-        """
-
-        self.unix_socket = path
-        self.timeout = timeout
-
-    def _init_socket(self):
-        """
-        internal use only
-        """
-        try:
-            self.clamd_socket = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-            self.clamd_socket.connect(self.unix_socket)
-            self.clamd_socket.settimeout(self.timeout)
-        except socket.error:
-            e = sys.exc_info()[1]
-            raise ConnectionError(self._error_message(e))
-
-    def _error_message(self, exception):
-        # args for socket.error can either be (errno, "message")
-        # or just "message"
-        if len(exception.args) == 1:
-            return "Error connecting to {path}. {msg}.".format(
-                path=self.unix_socket,
-                msg=exception.args[0]
-            )
-        else:
-            return "Error {erno} connecting {path}. {msg}.".format(
-                erno=exception.args[0],
-                path=self.unix_socket,
-                msg=exception.args[1]
-            )
+            raise exceptions.ResponseError(msg.rsplit("ERROR", 1)[0])
